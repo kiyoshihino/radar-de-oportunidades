@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { LayoutDashboard, Search, List, History, Radar, Settings } from 'lucide-react';
+import { LogoutButton } from './LogoutButton';
 
 export function Sidebar() {
   return (
@@ -28,6 +29,7 @@ export function Sidebar() {
         <Link href="/configuracoes" className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 hover:text-white transition-colors">
           <Settings size={20} /> Configurações
         </Link>
+        <LogoutButton />
       </div>
     </div>
   )
