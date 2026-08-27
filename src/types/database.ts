@@ -1,13 +1,34 @@
 export type Radar = {
   id: string
   name: string
-  status: 'ATIVO' | 'EM_BREVE' | 'INATIVO'
+  slug?: string
+  status: 'ATIVO' | 'EM_BREVE' | 'INATIVO' | 'PAUSADO'
   min_score: number | null
   min_profit: number | null
   min_margin_pct: number | null
   city: string | null
   region: string | null
   created_at: string
+}
+
+export type RadarItem = {
+  id: string
+  radar_id: string
+  name: string
+  search_query: string
+  aliases: string[] | null
+  excluded_keywords: string[] | null
+  status: 'ativo' | 'pausado' | 'arquivado'
+  priority: number | null
+  min_score: number | null
+  min_profit: number | null
+  min_margin_pct: number | null
+  max_asking_price: number | null
+  city: string | null
+  region: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type Listing = {
@@ -72,4 +93,27 @@ export type UserFeedback = {
   rating: number
   comments: string | null
   created_at: string
+}
+
+export type ComparableListing = {
+  source: string
+  title: string
+  price: number
+  city: string | null
+  url: string | null
+}
+
+export type MarketResearchResult = {
+  product_identified: string
+  comparable_count: number
+  lowest_price: number
+  highest_price: number
+  median_price: number
+  average_price: number
+  estimated_market_price: number
+  fast_sale_price: number
+  confidence_level: 'alta' | 'media' | 'baixa'
+  sources_used: string[]
+  comparables: ComparableListing[]
+  discarded_count: number
 }

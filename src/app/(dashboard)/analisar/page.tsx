@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, AlertTriangle, CheckCircle, CheckSquare, Info, Calculator, AlertCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, CheckSquare, Info, Calculator, AlertCircle, Search, ExternalLink } from "lucide-react";
 import { ScoreResult } from "@/lib/score";
-import { submitAnalysis } from "./actions";
+import { submitAnalysis, AnalysisResponse } from "./actions";
+import { MarketResearchResult } from "@/types/database";
 
 export default function AnalisarPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ScoreResult | null>(null);
+  const [marketResearch, setMarketResearch] = useState<MarketResearchResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [manualPrice, setManualPrice] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -17,11 +20,21 @@ export default function AnalisarPage() {
     
     const formData = new FormData(e.currentTarget);
     
-    const response = await submitAnalysis(formData);
+    const response: AnalysisResponse = await submitAnalysis(formData);
     
     if (response.error) {
       setErrorMsg(response.error);
-    } else if (response.result) {
+    }
+    
+    if (response.needsManualPrice) {
+      setManualPrice(true);
+    }
+
+    if (response.marketResearch) {
+      setMarketResearch(response.marketResearch);
+    }
+
+    if (response.result) {
       setResult(response.result);
     }
     
@@ -31,6 +44,7 @@ export default function AnalisarPage() {
   const resetAnalysis = () => {
     setResult(null);
     setErrorMsg(null);
+    setMarketResearch(null);
   };
 
   if (result) {
@@ -115,6 +129,53 @@ export default function AnalisarPage() {
               </div>
             </div>
 
+            {marketResearch && marketResearch.comparables.length > 0 && (
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <Search size={20} className="text-emerald-500" />
+                  COMO CHEGAMOS NESTE PREÇO
+                </h3>
+                
+                <p className="text-sm text-slate-600 mb-4">
+                  {marketResearch.comparable_count} anúncios comparáveis encontrados. Foram descartados {marketResearch.discarded_count} outliers.
+                </p>
+                
+                <div className="grid grid-cols-3 gap-4 mb-6 text-center">
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-xs text-slate-500">Mediana</p>
+                    <p className="font-bold text-slate-800">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(marketResearch.median_price)}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-xs text-slate-500">Média</p>
+                    <p className="font-bold text-slate-800">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(marketResearch.average_price)}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-xs text-slate-500">Faixa</p>
+                    <p className="font-bold text-slate-800">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(marketResearch.lowest_price)} - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(marketResearch.highest_price)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {marketResearch.comparables.map((comp, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+                      <div>
+                        <p className="text-xs text-slate-500">{comp.source} {comp.city ? `- ${comp.city}` : ''}</p>
+                        <p className="text-sm font-medium text-slate-800 line-clamp-1">{comp.title}</p>
+                      </div>
+                      <div className="flex items-center gap-3 text-right">
+                        <p className="font-bold text-slate-800">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comp.price)}</p>
+                        {comp.url && (
+                          <a href={comp.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700">
+                            <ExternalLink size={16} />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
@@ -179,9 +240,11 @@ export default function AnalisarPage() {
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
           
           {errorMsg && (
-            <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3">
-              <AlertCircle className="text-red-500 shrink-0" size={20} />
-              <p className="text-sm text-red-700 font-medium">{errorMsg}</p>
+            <div className="bg-red-50 p-4 rounded-lg flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="text-red-500 shrink-0" size={20} />
+                <p className="text-sm text-red-700 font-medium">{errorMsg}</p>
+              </div>
             </div>
           )}
 
@@ -239,20 +302,25 @@ export default function AnalisarPage() {
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-semibold text-slate-800" 
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">
-                Preço de Mercado Estimado (R$)
+
+            <div className="space-y-2 flex flex-col justify-end">
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600 pb-2">
+                <input 
+                  type="checkbox" 
+                  checked={manualPrice} 
+                  onChange={(e) => setManualPrice(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                />
+                Informar preço manualmente
               </label>
-              <input 
-                type="number" 
-                name="marketPrice"
-                required
-                placeholder="Ex: 3500"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-semibold text-blue-800 bg-blue-50" 
-              />
-              <p className="text-[10px] text-slate-500 leading-tight">
-                Temporário: será calculado automaticamente pelo Radar na V2.
-              </p>
+              {manualPrice && (
+                <input 
+                  type="number" 
+                  name="marketPrice"
+                  placeholder="Preço de Mercado (Ex: 3500)"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-semibold text-blue-800 bg-blue-50" 
+                />
+              )}
             </div>
           </div>
 
@@ -306,30 +374,31 @@ export default function AnalisarPage() {
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Fotos do Anúncio (Preparo V2)</label>
-            <div className="w-full h-32 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer bg-slate-50/50">
-              <Upload className="mb-2 text-slate-400" />
-              <span className="text-sm font-medium">Arraste fotos ou clique para upload</span>
-              <span className="text-xs text-slate-400 mt-1">Imagens serão usadas pela IA na versão futura</span>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100">
+          <div className="pt-4 border-t border-slate-100 flex gap-4">
             <button 
               type="submit" 
               disabled={isAnalyzing}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold text-lg rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+              className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold text-lg rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
             >
               {isAnalyzing ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Analisando e Salvando...
+                  Analisando mercado e salvando...
                 </>
               ) : (
                 "ANALISAR OPORTUNIDADE"
               )}
             </button>
+            {errorMsg && (
+              <button 
+                type="button" 
+                onClick={(e) => { e.preventDefault(); handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>); }}
+                disabled={isAnalyzing}
+                className="px-6 py-4 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-700 font-bold text-sm rounded-xl transition-all flex items-center justify-center"
+              >
+                TENTAR PESQUISA NOVAMENTE
+              </button>
+            )}
           </div>
         </form>
       </div>
