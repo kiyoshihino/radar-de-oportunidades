@@ -47,11 +47,22 @@ export type Listing = {
 }
 
 export type MarketPrice = {
-  id: string
-  category: string
-  model: string
-  avg_price: number
-  created_at: string
+  id?: string
+  product_key: string
+  category?: string
+  brand?: string | null
+  model?: string | null
+  variant?: string | null
+  storage?: string | null
+  condition?: string | null
+  source: string
+  reference_url: string
+  asking_price: number
+  city?: string | null
+  state?: string | null
+  metadata?: Record<string, unknown>
+  captured_at?: string
+  created_at?: string
 }
 
 export type Analysis = {

@@ -39,7 +39,7 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
 
     if (!marketPrice) {
       try {
-        marketResearch = await performMarketResearch(title, city);
+        marketResearch = await performMarketResearch(title, category, city);
         if (marketResearch.confidence_level === 'baixa' || marketResearch.estimated_market_price <= 0) {
           return { 
             error: 'Dados insuficientes para estimar o preço com segurança. Informe o preço manualmente.',
@@ -123,23 +123,6 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
       return { error: 'Falha ao salvar a análise (analysis).' }
     }
 
-    // Also save comparables to market_prices if we did research
-    if (marketResearch && marketResearch.comparables.length > 0) {
-      const comparablesToInsert = marketResearch.comparables.map(c => ({
-        category,
-        model: marketResearch?.product_identified || title,
-        avg_price: c.price,
-        // we can store raw data if we add a jsonb field, but for now map it to avg_price (which might be confusing)
-      }));
-      // Note: The requested schema 'market_prices' has: id, category, model, avg_price, created_at
-      // The user asked "Também salvar cada comparável válido em: public.market_prices"
-      // Wait, market_prices might be better to just save the overall average/median.
-      // But user said "salvar cada comparável". Since it has only 'avg_price', I'll use it to store the comparable's price.
-      const { error: mpError } = await supabase.from('market_prices').insert(comparablesToInsert);
-      if (mpError) {
-         console.error('Market prices insert error:', mpError);
-      }
-    }
 
     // 5. If score >= 70, insert into opportunities
     if (calculatedResult.score >= 70) {
