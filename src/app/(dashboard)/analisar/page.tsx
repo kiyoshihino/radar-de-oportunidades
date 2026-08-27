@@ -1,37 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, AlertTriangle, CheckCircle, CheckSquare, Info, Calculator } from "lucide-react";
-import { calculateScore, AnalysisData, ScoreResult } from "@/lib/score";
+import { Upload, AlertTriangle, CheckCircle, CheckSquare, Info, Calculator, AlertCircle } from "lucide-react";
+import { ScoreResult } from "@/lib/score";
+import { submitAnalysis } from "./actions";
 
 export default function AnalisarPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ScoreResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsAnalyzing(true);
+    setErrorMsg(null);
     
-    // Simulate API/AI delay
-    setTimeout(() => {
-      // Mocked data that would come from the form + AI in the future
-      const data: AnalysisData = {
-        price: 2700,
-        marketPrice: 3800, // Preço de mercado de um iPhone 15 128GB usado
-        liquidity: 'alta',
-        motivation: 'alta',
-        recency: 'hoje',
-        location: 'centro'
-      };
-      
-      const calculatedResult = calculateScore(data);
-      setResult(calculatedResult);
-      setIsAnalyzing(false);
-    }, 1500);
+    const formData = new FormData(e.currentTarget);
+    
+    const response = await submitAnalysis(formData);
+    
+    if (response.error) {
+      setErrorMsg(response.error);
+    } else if (response.result) {
+      setResult(response.result);
+    }
+    
+    setIsAnalyzing(false);
   };
 
   const resetAnalysis = () => {
     setResult(null);
+    setErrorMsg(null);
   };
 
   if (result) {
@@ -89,27 +88,25 @@ export default function AnalisarPage() {
               
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                  <p className="text-sm text-slate-500">Preço Pedido</p>
-                  <p className="text-xl font-bold text-slate-800">R$ 2.700,00</p>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                  <p className="text-sm text-slate-500">Preço de Mercado Est.</p>
-                  <p className="text-xl font-bold text-slate-800">R$ 3.800,00</p>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
                   <p className="text-sm text-slate-500">Venda Rápida Est.</p>
-                  <p className="text-xl font-bold text-blue-600">R$ {result.fastSalePrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xl font-bold text-blue-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(result.fastSalePrice)}
+                  </p>
                 </div>
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
                   <p className="text-sm text-slate-500">Máximo Recomendado</p>
-                  <p className="text-xl font-bold text-purple-600">R$ {result.maxBuyPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xl font-bold text-purple-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(result.maxBuyPrice)}
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-6">
                 <div>
                   <p className="text-sm text-slate-500">Lucro Bruto Potencial</p>
-                  <p className="text-3xl font-black text-emerald-600">R$ {result.potentialProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-3xl font-black text-emerald-600">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(result.potentialProfit)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Margem Potencial</p>
@@ -127,20 +124,18 @@ export default function AnalisarPage() {
                 <ul className="space-y-3">
                   <li className="flex items-start gap-2 text-sm text-slate-600">
                     <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                    Preço 28% abaixo da média de mercado
+                    Preço abaixo da média de mercado
                   </li>
                   <li className="flex items-start gap-2 text-sm text-slate-600">
                     <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                    Produto de altíssima liquidez (iPhone 15)
+                    Produto de alta liquidez
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-slate-600">
-                    <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                    Vendedor demonstra urgência (&quot;motivo de viagem&quot;)
-                  </li>
-                  <li className="flex items-start gap-2 text-sm text-slate-600">
-                    <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                    Anúncio postado há menos de 2 horas
-                  </li>
+                  {result.score >= 70 && (
+                    <li className="flex items-start gap-2 text-sm text-slate-600">
+                      <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+                      Score favorável para negociação rápida
+                    </li>
+                  )}
                 </ul>
               </div>
 
@@ -154,7 +149,7 @@ export default function AnalisarPage() {
                     <CheckSquare size={16} className="text-slate-400" /> Conferir IMEI
                   </li>
                   <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Conferir iCloud (buscar iPhone)
+                    <CheckSquare size={16} className="text-slate-400" /> Conferir iCloud
                   </li>
                   <li className="flex items-center gap-2 text-sm text-slate-600">
                     <CheckSquare size={16} className="text-slate-400" /> Conferir Face ID
@@ -163,13 +158,7 @@ export default function AnalisarPage() {
                     <CheckSquare size={16} className="text-slate-400" /> Saúde da bateria
                   </li>
                   <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Conferir câmeras e microfone
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Conferir True Tone
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Histórico de peças substituídas
+                    <CheckSquare size={16} className="text-slate-400" /> Conferir procedência
                   </li>
                 </ul>
               </div>
@@ -189,21 +178,29 @@ export default function AnalisarPage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
           
+          {errorMsg && (
+            <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3">
+              <AlertCircle className="text-red-500 shrink-0" size={20} />
+              <p className="text-sm text-red-700 font-medium">{errorMsg}</p>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Fonte do Anúncio</label>
-              <select className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                <option>Facebook Marketplace</option>
-                <option>OLX</option>
-                <option>Mercado Livre</option>
-                <option>WhatsApp</option>
-                <option>Outro</option>
+              <select name="source" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                <option value="Facebook Marketplace">Facebook Marketplace</option>
+                <option value="OLX">OLX</option>
+                <option value="Mercado Livre">Mercado Livre</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Outro">Outro</option>
               </select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Link do Anúncio (Opcional)</label>
               <input 
                 type="url" 
+                name="url"
                 placeholder="https://..."
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
               />
@@ -214,31 +211,48 @@ export default function AnalisarPage() {
             <label className="text-sm font-medium text-slate-700">Título do Anúncio</label>
             <input 
               type="text" 
+              name="title"
               required
-              defaultValue="iPhone 15 128GB - Novo na caixa"
+              placeholder="Ex: iPhone 15 128GB - Novo na caixa"
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Categoria</label>
-              <select className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                <option>iPhone</option>
-                <option>MacBook</option>
-                <option>iPad</option>
-                <option>Apple Watch</option>
-                <option>Outros Smartphones</option>
+              <select name="category" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                <option value="iPhone">iPhone</option>
+                <option value="MacBook">MacBook</option>
+                <option value="iPad">iPad</option>
+                <option value="Apple Watch">Apple Watch</option>
+                <option value="Outros">Outros Smartphones</option>
               </select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Preço Pedido (R$)</label>
               <input 
                 type="number" 
+                name="price"
                 required
-                defaultValue="2700"
+                placeholder="Ex: 2700"
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-semibold text-slate-800" 
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">
+                Preço de Mercado Estimado (R$)
+              </label>
+              <input 
+                type="number" 
+                name="marketPrice"
+                required
+                placeholder="Ex: 3500"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-semibold text-blue-800 bg-blue-50" 
+              />
+              <p className="text-[10px] text-slate-500 leading-tight">
+                Temporário: será calculado automaticamente pelo Radar na V2.
+              </p>
             </div>
           </div>
 
@@ -246,7 +260,8 @@ export default function AnalisarPage() {
             <label className="text-sm font-medium text-slate-700">Descrição do Vendedor</label>
             <textarea 
               rows={4}
-              defaultValue="Vendo iPhone 15 128gb lacrado. Motivo: ganhei da empresa e já tenho um. Preciso vender rápido para pagar contas. Apenas venda, não aceito troca."
+              name="description"
+              placeholder="Cole aqui a descrição exata feita pelo vendedor..."
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" 
             />
           </div>
@@ -256,6 +271,7 @@ export default function AnalisarPage() {
               <label className="text-sm font-medium text-slate-700">Cidade</label>
               <input 
                 type="text" 
+                name="city"
                 defaultValue="Londrina"
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
               />
@@ -264,17 +280,18 @@ export default function AnalisarPage() {
               <label className="text-sm font-medium text-slate-700">Bairro (Opcional)</label>
               <input 
                 type="text" 
-                defaultValue="Centro"
+                name="neighborhood"
+                placeholder="Ex: Centro"
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Postado há</label>
-              <select className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
-                <option>Hoje</option>
-                <option>Ontem</option>
-                <option>Esta semana</option>
-                <option>Mais antigo</option>
+              <select name="posted_time" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                <option value="Hoje">Hoje</option>
+                <option value="Ontem">Ontem</option>
+                <option value="Esta semana">Esta semana</option>
+                <option value="Mais antigo">Mais antigo</option>
               </select>
             </div>
           </div>
@@ -283,6 +300,7 @@ export default function AnalisarPage() {
             <label className="text-sm font-medium text-slate-700">Observações (Opcionais)</label>
             <input 
               type="text" 
+              name="observations"
               placeholder="Ex: Não tem caixa, carregador paralelo..."
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
             />
@@ -306,7 +324,7 @@ export default function AnalisarPage() {
               {isAnalyzing ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Analisando com IA...
+                  Analisando e Salvando...
                 </>
               ) : (
                 "ANALISAR OPORTUNIDADE"
