@@ -11,7 +11,7 @@ export async function evaluateWithGemini(
     throw new Error('GEMINI_API_KEY não configurada no servidor.');
   }
 
-  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+  const modelName = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
   const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `
@@ -84,7 +84,12 @@ CONTEÚDO: ${r.content}
 
     const evaluation: AIEvaluation = JSON.parse(response.text);
     return evaluation;
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes('404') || errorMessage.includes('not found') || errorMessage.includes('no longer available')) {
+      console.error('Modelo Gemini indisponível:', errorMessage);
+      throw new Error('Modelo de inteligência artificial indisponível no momento.');
+    }
     console.error('Falha na validação do Gemini:', error);
     throw new Error('Falha na comunicação ou parse com o Gemini.');
   }
