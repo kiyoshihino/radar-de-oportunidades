@@ -101,6 +101,8 @@ export type ComparableListing = {
   price: number
   city: string | null
   url: string | null
+  condition?: string | null
+  date_posted?: string | null
 }
 
 export type MarketResearchResult = {

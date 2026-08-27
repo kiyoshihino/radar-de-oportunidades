@@ -7,28 +7,24 @@ export async function performMarketResearch(title: string, city: string | null):
     throw new Error('OPENAI_API_KEY não configurada no servidor.');
   }
 
-  const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Use gpt-4o as default as it supports latest features
+  const model = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
   const openai = new OpenAI({ apiKey });
 
   const prompt = `
 Você é um especialista em pesquisa de mercado de produtos usados no Brasil.
-Seu objetivo é analisar o mercado para o produto: "${title}" ${city ? `na região de ${city}` : ''}.
+Seu objetivo é pesquisar na web em tempo real e encontrar anúncios REAIS e ATUAIS para o produto: "${title}" ${city ? `na região de ${city}` : ''}.
 
-REGRAS CRÍTICAS:
-1. Retorne EXATAMENTE os dados solicitados no formato JSON.
-2. Identifique anúncios de usados semelhantes (mínimo 3, ideal 5-8).
-3. EXCLUA: preços absurdamente baixos/altos, acessórios (capinhas, películas, carregadores isolados), produtos quebrados, sucata, peças, ou produtos que não correspondam exatamente ao modelo e capacidade.
-4. EXCLUA: preços de produtos novos de lojas oficiais (buscamos preço de mercado de USADOS).
-5. Se não houver dados ou referências reais suficientes para estipular o preço, preencha confidence_level como 'baixa' e defina estimated_market_price como 0. NÃO INVENTE VALORES.
-6. A moeda é BRL (reais), retorne apenas o número (ex: 3500).
+REGRAS CRÍTICAS (SIGA RIGOROSAMENTE):
+1. OBRIGATÓRIO: Utilize a ferramenta de Web Search para buscar os preços atuais. NÃO utilize seu conhecimento interno ou invente preços/anúncios.
+2. Identifique anúncios de usados semelhantes (mínimo 3, ideal 5-8). Extraia título, preço, fonte, url (o link real para o anúncio), cidade/região, condição e data/recência.
+3. EXCLUA: preços absurdamente baixos/altos, acessórios, peças ou novos de lojas oficiais. Buscamos preço de mercado de USADOS de pessoas físicas/revendedores.
+4. Você deve preencher a lista de 'comparables' apenas com resultados da sua busca na web que possuam URL e Fonte válidas.
+5. Se a busca na web não retornar no mínimo 3 comparáveis válidos e verificáveis, você DEVE retornar a lista 'comparables' VAZIA.
+6. A moeda é BRL (reais), retorne apenas o número para preços.
 
-Para o cálculo:
-- estimated_market_price: Preço médio praticado no mercado secundário (usados).
-- fast_sale_price: Preço agressivo para venda rápida (geralmente 15-20% abaixo do mercado).
-- lowest_price, highest_price, median_price e average_price: Estatísticas com base nos comparáveis válidos.
-
-Gere os comparáveis (ComparableListing) no formato:
-{ source: "nome da plataforma", title: "título do anuncio", price: 1234, city: "nome da cidade ou null", url: "url fictícia se não tiver" }
+Cálculos financeiros se encontrar anúncios reais:
+- estimated_market_price: Preço médio praticado (removendo os outliers)
+- fast_sale_price: 15-20% abaixo do mercado
 `;
 
   try {
@@ -36,7 +32,13 @@ Gere os comparáveis (ComparableListing) no formato:
       model: model,
       messages: [
         { role: 'system', content: prompt },
-        { role: 'user', content: `Faça a pesquisa de mercado para: ${title}` }
+        { role: 'user', content: `Faça a pesquisa de mercado em tempo real usando a web para: ${title}` }
+      ],
+      // Explicitly enable web search tool (assuming standard format for OpenAI Responses API / Chat Completions that supports it)
+      tools: [
+        {
+          type: "web_search"
+        } as unknown as OpenAI.Chat.Completions.ChatCompletionTool 
       ],
       response_format: {
         type: 'json_schema',
@@ -65,9 +67,11 @@ Gere os comparáveis (ComparableListing) no formato:
                     title: { type: 'string' },
                     price: { type: 'number' },
                     city: { type: 'string', nullable: true },
-                    url: { type: 'string', nullable: true }
+                    url: { type: 'string', nullable: true },
+                    condition: { type: 'string', nullable: true },
+                    date_posted: { type: 'string', nullable: true }
                   },
-                  required: ['source', 'title', 'price', 'city', 'url'],
+                  required: ['source', 'title', 'price', 'city', 'url', 'condition', 'date_posted'],
                   additionalProperties: false
                 }
               },
@@ -91,7 +95,7 @@ Gere os comparáveis (ComparableListing) no formato:
           }
         }
       },
-      temperature: 0.2,
+      temperature: 0.1,
     });
 
     const content = response.choices[0].message.content;
@@ -100,6 +104,11 @@ Gere os comparáveis (ComparableListing) no formato:
     }
 
     const parsed: MarketResearchResult = JSON.parse(content);
+
+    if (parsed.comparables.length < 3) {
+      throw new Error('Dados insuficientes para estimar o preço com segurança.');
+    }
+
     return parsed;
   } catch (error) {
     console.error('Market research error:', error);

@@ -48,10 +48,11 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
           }
         }
         marketPrice = marketResearch.estimated_market_price;
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('Falha na pesquisa de mercado:', e);
+        const isInsufficient = e instanceof Error && e.message === 'Dados insuficientes para estimar o preço com segurança.';
         return { 
-          error: 'Não foi possível pesquisar o mercado neste momento.',
+          error: isInsufficient ? e.message : 'Não foi possível pesquisar o mercado neste momento.',
           needsManualPrice: true
         }
       }
