@@ -137,7 +137,7 @@ export default async function Dashboard() {
                   <tr key={op.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 font-medium text-slate-800">{op.listings?.title}</td>
                     <td className="px-6 py-4 text-slate-600">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings?.price || 0)}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings?.asking_price || 0)}
                     </td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.analyses?.fast_sale_price || 0)}

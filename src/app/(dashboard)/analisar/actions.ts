@@ -67,17 +67,17 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
         source,
         url: url || null,
         category,
-        price,
+        asking_price: price,
         city,
         neighborhood,
-        posted_time,
+        posted_text: posted_time,
         observations
       })
       .select('id')
       .single()
 
     if (listingError || !listing) {
-      console.error('Listing insert error:', listingError)
+      console.error(`Listing insert error: [${listingError?.code}] ${listingError?.message}`, listingError)
       return { error: 'Falha ao salvar o anúncio (listing).' }
     }
 
@@ -119,7 +119,7 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
       .single()
 
     if (analysisError || !analysis) {
-      console.error('Analysis insert error:', analysisError)
+      console.error(`Analysis insert error: [${analysisError?.code}] ${analysisError?.message}`, analysisError)
       return { error: 'Falha ao salvar a análise (analysis).' }
     }
 
@@ -135,7 +135,7 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
         })
 
       if (opportunityError) {
-        console.error('Opportunity insert error:', opportunityError)
+        console.error(`Opportunity insert error: [${opportunityError?.code}] ${opportunityError?.message}`, opportunityError)
       }
     }
 

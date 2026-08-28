@@ -38,10 +38,10 @@ export type Listing = {
   source: string
   url: string | null
   category: string
-  price: number
+  asking_price: number
   city: string | null
   neighborhood: string | null
-  posted_time: string | null
+  posted_text: string | null
   observations: string | null
   created_at: string
 }

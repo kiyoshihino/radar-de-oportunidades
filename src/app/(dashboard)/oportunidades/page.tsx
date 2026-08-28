@@ -75,7 +75,7 @@ export default async function OportunidadesPage() {
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-sm text-slate-600">Preço Pedido</span>
                     <span className="font-bold text-slate-800">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings.price)}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings.asking_price)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-emerald-600">
@@ -115,7 +115,7 @@ export default async function OportunidadesPage() {
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-sm text-slate-600">Preço Pedido</span>
                     <span className="font-bold text-slate-800">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings.price)}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings.asking_price)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-emerald-600">
@@ -155,7 +155,7 @@ export default async function OportunidadesPage() {
                   <div>
                     <p className="text-xs text-slate-500">Pedido</p>
                     <p className="font-bold text-slate-800">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings.price)}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings.asking_price)}
                     </p>
                   </div>
                   <div className="text-right">

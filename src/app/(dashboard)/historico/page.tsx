@@ -88,7 +88,7 @@ export default async function HistoricoPage() {
                     <td className="px-6 py-4 text-slate-500">{item.listings?.source}</td>
                     <td className="px-6 py-4">
                       <div className="text-slate-800 font-medium">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.listings?.price || 0)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.listings?.asking_price || 0)}
                       </div>
                       <div className="text-slate-400 text-xs line-through">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.market_price || 0)}
