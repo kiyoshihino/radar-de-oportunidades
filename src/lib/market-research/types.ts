@@ -12,6 +12,9 @@ export type AIValidationResult = {
   valid: boolean;
   extractedPrice: number | null;
   condition: string | null;
+  matchConfidence: 'high' | 'medium' | 'low';
+  sellerType: string;
+  capacity: string | null;
   rejectionReason: string | null;
 };
 
@@ -22,6 +25,15 @@ export type AIEvaluation = {
     variant: string | null;
     storage: string | null;
     condition: string | null;
+    batteryHealth: number | null;
+    screenCondition: string | null;
+    backCondition: string | null;
+    cameraCondition: string | null;
+    faceIdWorking: boolean | null;
+    originalParts: boolean | null;
+    hasBox: boolean | null;
+    hasCharger: boolean | null;
+    knownDamage: string | null;
   };
   evaluatedResults: AIValidationResult[];
 };

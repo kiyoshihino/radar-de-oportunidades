@@ -3,6 +3,7 @@ import { SearchResult, AIEvaluation } from '../types';
 
 export async function evaluateWithGemini(
   targetProductTitle: string,
+  targetProductDescription: string,
   city: string | null,
   tavilyResults: SearchResult[]
 ): Promise<AIEvaluation> {
@@ -17,23 +18,32 @@ export async function evaluateWithGemini(
   const prompt = `
 Você é um especialista em validação de anúncios de mercado de produtos usados no Brasil.
 O produto alvo a ser analisado é: "${targetProductTitle}" ${city ? `na região de ${city}` : ''}.
+Descrição do produto alvo: "${targetProductDescription}".
 
-Abaixo estão os resultados extraídos da pesquisa (providos por um sistema de busca na web).
-Sua ÚNICA tarefa é ler cada resultado retornado, identificar se é o mesmo produto (levando em conta modelo, armazenamento/especificações e se é usado/novo), extrair o preço pedido (em BRL, apenas números), e identificar a condição (usado, novo, etc).
+Abaixo estão os resultados extraídos da pesquisa.
+Sua tarefa tem duas partes:
 
-Regras de Validação para cada item:
+PARTE 1: Extrair a condição exata do PRODUTO ALVO com base na descrição.
+Não invente estado. Se a informação não estiver na descrição, use null.
+Para campos booleanos (Face ID, peças originais, caixa, carregador): true se explicitamente confirmar que tem/funciona, false se explicitamente disser que não tem/não funciona, null se não falar nada.
+Bateria: extraia apenas o número inteiro da saúde (ex: 85).
+
+PARTE 2: Ler cada resultado retornado pela pesquisa e validá-lo.
+Regras OBRIGATÓRIAS para os resultados:
 - resultId: OBRIGATÓRIO retornar o resultId exato fornecido. Nunca invente IDs.
-- valid: true se for o mesmo produto do título, e for um produto USADO/SEMINOVO.
-- valid: false se for novo (de loja), peças (sucata), capa/película/acessório, ou se o preço não for determinável.
-- extractedPrice: o valor encontrado no anúncio em BRL. Apenas números (ex: 4100).
-- condition: 'usado', 'seminovo', 'novo', etc.
-- rejectionReason: se valid = false, explique de forma curta por que foi rejeitado (ex: "Produto novo", "Capa apenas", "Preço ausente").
-
-NÃO FAÇA BUSCAS. NÃO CRIE URLs. Use estritamente as informações fornecidas abaixo.
+- sellerType: classifique o vendedor daquele link como 'private' (particular), 'store' (loja seminovos), 'retailer_new' (varejo vendendo novo, ex: Amazon, Magalu, Zoom), ou 'unknown'.
+- valid: true APENAS se for o MESMO produto, USADO/SEMINOVO, e NÃO for retailer_new. Falsos para peças, acessórios, ou aparelhos diferentes.
+- extractedPrice: valor pedido em BRL, apenas números. NUNCA invente se não estiver no texto do anúncio. Se ausente, valid = false.
+- capacity: extraia a capacidade de armazenamento se houver no anúncio (ex: "256GB").
+- matchConfidence:
+  - 'high': modelo, versão (Pro/Max) e armazenamento correspondem exatamente ao alvo.
+  - 'medium': modelo corresponde, mas falta confirmar armazenamento ou versão.
+  - 'low': parece o modelo, mas há muitas incertezas ou divergências.
 
 RESULTADOS DA PESQUISA:
 ${tavilyResults.map(r => `
 ID: ${r.id}
+FONTE: ${r.source}
 TÍTULO: ${r.title}
 CONTEÚDO: ${r.content}
 `).join('\n---')}
@@ -56,6 +66,15 @@ CONTEÚDO: ${r.content}
                 variant: { type: Type.STRING, nullable: true },
                 storage: { type: Type.STRING, nullable: true },
                 condition: { type: Type.STRING, nullable: true },
+                batteryHealth: { type: Type.NUMBER, nullable: true },
+                screenCondition: { type: Type.STRING, nullable: true },
+                backCondition: { type: Type.STRING, nullable: true },
+                cameraCondition: { type: Type.STRING, nullable: true },
+                faceIdWorking: { type: Type.BOOLEAN, nullable: true },
+                originalParts: { type: Type.BOOLEAN, nullable: true },
+                hasBox: { type: Type.BOOLEAN, nullable: true },
+                hasCharger: { type: Type.BOOLEAN, nullable: true },
+                knownDamage: { type: Type.STRING, nullable: true }
               }
             },
             evaluatedResults: {
@@ -67,9 +86,12 @@ CONTEÚDO: ${r.content}
                   valid: { type: Type.BOOLEAN },
                   extractedPrice: { type: Type.NUMBER, nullable: true },
                   condition: { type: Type.STRING, nullable: true },
+                  matchConfidence: { type: Type.STRING },
+                  sellerType: { type: Type.STRING },
+                  capacity: { type: Type.STRING, nullable: true },
                   rejectionReason: { type: Type.STRING, nullable: true }
                 },
-                required: ["resultId", "valid"]
+                required: ["resultId", "valid", "matchConfidence", "sellerType"]
               }
             }
           },

@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle, CheckSquare, Info, Calculator, AlertCircle,
 import { ScoreResult } from "@/lib/score";
 import { submitAnalysis, AnalysisResponse } from "./actions";
 import { MarketResearchResult } from "@/types/database";
+import { ConditionAdjustmentResult } from "@/lib/valuation/iphone-condition";
 
 
 const getClassificationLabel = (val: string) => {
@@ -22,6 +23,7 @@ export default function AnalisarPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [marketResearch, setMarketResearch] = useState<MarketResearchResult | null>(null);
+  const [conditionAdjustment, setConditionAdjustment] = useState<ConditionAdjustmentResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [manualPrice, setManualPrice] = useState(false);
 
@@ -46,6 +48,10 @@ export default function AnalisarPage() {
       setMarketResearch(response.marketResearch);
     }
 
+    if (response.conditionAdjustment) {
+      setConditionAdjustment(response.conditionAdjustment);
+    }
+
     if (response.result) {
       setResult(response.result);
     }
@@ -57,6 +63,7 @@ export default function AnalisarPage() {
     setResult(null);
     setErrorMsg(null);
     setMarketResearch(null);
+    setConditionAdjustment(null);
   };
 
   if (result) {
@@ -107,10 +114,43 @@ export default function AnalisarPage() {
 
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-              <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                <Calculator size={20} className="text-blue-500" />
-                Análise Financeira
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                  <Calculator size={20} className="text-blue-500" />
+                  Análise Financeira
+                </h3>
+                {marketResearch && (
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    marketResearch.confidence_level === 'alta' ? 'bg-emerald-100 text-emerald-700' :
+                    marketResearch.confidence_level === 'media' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    Confiança: {marketResearch.confidence_level.toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              {conditionAdjustment && conditionAdjustment.adjustments.length > 0 && (
+                <div className="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <p className="text-sm font-medium text-slate-600 mb-2">Descontos por Condição (Aparelho Alvo)</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm text-slate-500">
+                      <span>Mercado Padrão (Seminovo)</span>
+                      <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(marketResearch?.estimated_market_price || 0)}</span>
+                    </div>
+                    {conditionAdjustment.adjustments.map((adj, idx) => (
+                      <div key={idx} className="flex justify-between text-sm text-red-500">
+                        <span>- {adj.label}</span>
+                        <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(adj.amount || 0)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between font-bold text-slate-800 pt-2 border-t border-slate-200 mt-2">
+                      <span>Mercado Ajustado</span>
+                      <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conditionAdjustment.conditionAdjustedMarketPrice)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
@@ -169,18 +209,33 @@ export default function AnalisarPage() {
 
                 <div className="space-y-3">
                   {marketResearch.comparables.map((comp, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
-                      <div>
-                        <p className="text-xs text-slate-500">{comp.source} {comp.city ? `- ${comp.city}` : ''}</p>
-                        <p className="text-sm font-medium text-slate-800 line-clamp-1">{comp.title}</p>
-                      </div>
-                      <div className="flex items-center gap-3 text-right">
-                        <p className="font-bold text-slate-800">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comp.price)}</p>
-                        {comp.url && (
-                          <a href={comp.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700">
-                            <ExternalLink size={16} />
-                          </a>
-                        )}
+                    <div key={idx} className="flex flex-col gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="text-xs text-slate-500 font-medium">{comp.source} {comp.city ? `- ${comp.city}` : ''} • {comp.sellerType || 'unknown'}</p>
+                          <p className="text-sm font-bold text-slate-800 line-clamp-1">{comp.title}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {comp.capacity && <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{comp.capacity}</span>}
+                            {comp.condition && <span className="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{comp.condition}</span>}
+                            {comp.matchConfidence && (
+                              <span className={`text-xs px-2 py-0.5 rounded ${
+                                comp.matchConfidence === 'high' ? 'bg-emerald-100 text-emerald-700' :
+                                comp.matchConfidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                Match: {comp.matchConfidence}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <p className="font-bold text-blue-600 text-lg">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comp.price)}</p>
+                          {comp.url && (
+                            <a href={comp.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 text-xs flex items-center gap-1">
+                              Ver <ExternalLink size={12} />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -215,25 +270,46 @@ export default function AnalisarPage() {
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
                   <AlertTriangle size={20} className="text-yellow-500" />
-                  Riscos e Verificações (iPhone)
+                  Riscos e Verificações
                 </h3>
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Conferir IMEI
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Conferir iCloud
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Conferir Face ID
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Saúde da bateria
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-slate-600">
-                    <CheckSquare size={16} className="text-slate-400" /> Conferir procedência
-                  </li>
-                </ul>
+                
+                {conditionAdjustment?.knownIssues && conditionAdjustment.knownIssues.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-bold text-red-500 uppercase mb-2">Problemas Identificados</p>
+                    <ul className="space-y-2">
+                      {conditionAdjustment.knownIssues.map((issue, idx) => (
+                        <li key={idx} className="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                          <AlertCircle size={16} className="text-red-500 shrink-0" /> {issue}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-2">Requer Verificação</p>
+                  <ul className="space-y-2">
+                    {conditionAdjustment?.unverifiedRisks ? (
+                      conditionAdjustment.unverifiedRisks.map((risk, idx) => (
+                        <li key={idx} className="flex items-center gap-2 text-sm text-slate-600">
+                          <CheckSquare size={16} className="text-slate-400 shrink-0" /> {risk}
+                        </li>
+                      ))
+                    ) : (
+                      <>
+                        <li className="flex items-center gap-2 text-sm text-slate-600">
+                          <CheckSquare size={16} className="text-slate-400" /> Conferir IMEI
+                        </li>
+                        <li className="flex items-center gap-2 text-sm text-slate-600">
+                          <CheckSquare size={16} className="text-slate-400" /> Conferir iCloud
+                        </li>
+                        <li className="flex items-center gap-2 text-sm text-slate-600">
+                          <CheckSquare size={16} className="text-slate-400" /> Conferir procedência
+                        </li>
+                      </>
+                    )}
+                  </ul>
+                </div>
               </div>
             </div>
           </div>

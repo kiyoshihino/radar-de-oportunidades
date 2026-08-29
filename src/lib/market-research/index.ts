@@ -3,12 +3,22 @@ import { generateProductKey, getCachedComparables, saveComparablesToCache } from
 import { searchTavily } from './providers/tavily';
 import { evaluateWithGemini } from './providers/gemini';
 import { analyzePrices } from './statistics';
-import { SearchResult } from './types';
+import { SearchResult, AIEvaluation } from './types';
+import { TargetConditionValue } from '../valuation/iphone-condition';
+
+function mapToTargetConditionValue<T>(val: T | null | undefined): TargetConditionValue<T> {
+  return {
+    value: val ?? null,
+    evidence: val !== null && val !== undefined ? 'Extraído da descrição' : null,
+    confidence: val !== null && val !== undefined ? 'explicit' : 'unknown'
+  };
+}
 
 export async function performMarketResearch(
   title: string, 
   category: string, 
-  city: string | null
+  city: string | null,
+  description: string
 ): Promise<MarketResearchResult> {
   const searchProvider = process.env.SEARCH_PROVIDER || 'tavily';
   const aiProvider = process.env.AI_PROVIDER || 'gemini';
@@ -40,6 +50,7 @@ export async function performMarketResearch(
   ];
 
   let discardedCount = 0;
+  let targetProductEvaluation: AIEvaluation['targetProduct'] | null = null;
 
   for (let i = 0; i < maxSearches && validComparables.length < 3; i++) {
     const query = searchQueries[i] || searchQueries[0];
@@ -51,7 +62,11 @@ export async function performMarketResearch(
     searchResults.forEach(r => tavilyUrls.set(r.id, r));
 
     // Validate with Gemini
-    const evaluation = await evaluateWithGemini(title, city, searchResults);
+    const evaluation = await evaluateWithGemini(title, description, city, searchResults);
+    
+    if (!targetProductEvaluation) {
+      targetProductEvaluation = evaluation.targetProduct;
+    }
 
     // Map and filter results
     for (const evaluated of evaluation.evaluatedResults) {
@@ -78,7 +93,10 @@ export async function performMarketResearch(
                 tavilyScore: originalTavily.score,
                 validationProvider: 'gemini',
                 searchQuery: query,
-                resultId: evaluated.resultId
+                resultId: evaluated.resultId,
+                matchConfidence: evaluated.matchConfidence,
+                sellerType: evaluated.sellerType,
+                capacity: evaluated.capacity
               },
               captured_at: new Date().toISOString()
             });
@@ -102,10 +120,20 @@ export async function performMarketResearch(
   const stats = analyzePrices(prices);
 
   // Re-filter the validComparables to match the statistical outliers removed
-  const finalComparables = validComparables.filter(c => stats.validPrices.includes(c.asking_price));
+  let finalComparables = validComparables.filter(c => stats.validPrices.includes(c.asking_price));
   
+  // Apply matchConfidence filtering
+  // Discard 'low'
+  finalComparables = finalComparables.filter(c => c.metadata?.matchConfidence !== 'low');
+  
+  // If >= 3 HIGH, discard MEDIUM
+  const highCount = finalComparables.filter(c => c.metadata?.matchConfidence === 'high').length;
+  if (highCount >= 3) {
+    finalComparables = finalComparables.filter(c => c.metadata?.matchConfidence === 'high');
+  }
+
   if (finalComparables.length < 3) {
-    throw new Error('Dados insuficientes para estimar o preço com segurança.');
+    throw new Error('Dados insuficientes (menos de 3 comparáveis confiáveis) para estimar o preço com segurança.');
   }
 
   // 4. Cache the results
@@ -119,10 +147,20 @@ export async function performMarketResearch(
     city: c.city || null,
     url: c.reference_url,
     condition: c.condition,
-    date_posted: new Date().toISOString()
+    date_posted: new Date().toISOString(),
+    matchConfidence: c.metadata?.matchConfidence as 'high' | 'medium' | 'low' | undefined,
+    sellerType: c.metadata?.sellerType as string | undefined,
+    capacity: c.metadata?.capacity as string | undefined
   }));
 
   const sourcesUsed = Array.from(new Set(finalComparables.map(c => c.source)));
+  
+  let confidence_level: 'alta' | 'media' | 'baixa' = 'media';
+  if (highCount >= 5) {
+    confidence_level = 'alta';
+  } else if (finalComparables.length < 3) {
+    confidence_level = 'baixa';
+  }
 
   return {
     product_identified: finalComparables[0].model || title,
@@ -133,10 +171,21 @@ export async function performMarketResearch(
     average_price: stats.average,
     estimated_market_price: stats.marketPrice,
     fast_sale_price: stats.quickSalePrice,
-    confidence_level: finalComparables.length >= 5 ? 'alta' : 'media',
+    confidence_level,
     sources_used: sourcesUsed,
     comparables: comparablesForOutput,
-    discarded_count: discardedCount + stats.outliersRemoved
+    discarded_count: discardedCount + stats.outliersRemoved,
+    target_condition: targetProductEvaluation ? {
+      batteryHealth: mapToTargetConditionValue(targetProductEvaluation.batteryHealth),
+      screenCondition: mapToTargetConditionValue(targetProductEvaluation.screenCondition),
+      backCondition: mapToTargetConditionValue(targetProductEvaluation.backCondition),
+      cameraCondition: mapToTargetConditionValue(targetProductEvaluation.cameraCondition),
+      faceIdWorking: mapToTargetConditionValue(targetProductEvaluation.faceIdWorking),
+      originalParts: mapToTargetConditionValue(targetProductEvaluation.originalParts),
+      hasBox: mapToTargetConditionValue(targetProductEvaluation.hasBox),
+      hasCharger: mapToTargetConditionValue(targetProductEvaluation.hasCharger),
+      knownDamage: mapToTargetConditionValue(targetProductEvaluation.knownDamage)
+    } : undefined
   };
 }
 
@@ -159,7 +208,10 @@ function buildMarketResearchResultFromCache(cached: MarketPrice[], title: string
     city: c.city || null,
     url: c.reference_url,
     condition: c.condition,
-    date_posted: c.captured_at
+    date_posted: c.captured_at,
+    matchConfidence: c.metadata?.matchConfidence as 'high' | 'medium' | 'low' | undefined,
+    sellerType: c.metadata?.sellerType as string | undefined,
+    capacity: c.metadata?.capacity as string | undefined
   }));
 
   const sourcesUsed = Array.from(new Set(finalComparables.map(c => c.source)));

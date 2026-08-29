@@ -1,3 +1,5 @@
+import { TargetCondition } from '@/lib/valuation/iphone-condition'
+
 export type Radar = {
   id: string
   name: string
@@ -124,6 +126,9 @@ export type ComparableListing = {
   url: string | null
   condition?: string | null
   date_posted?: string | null
+  matchConfidence?: 'high' | 'medium' | 'low'
+  sellerType?: string
+  capacity?: string | null
 }
 
 export type MarketResearchResult = {
@@ -139,4 +144,5 @@ export type MarketResearchResult = {
   sources_used: string[]
   comparables: ComparableListing[]
   discarded_count: number
+  target_condition?: TargetCondition
 }

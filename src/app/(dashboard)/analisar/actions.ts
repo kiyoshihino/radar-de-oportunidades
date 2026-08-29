@@ -5,10 +5,12 @@ import { calculateScore, AnalysisData, ScoreResult } from '@/lib/score'
 import { performMarketResearch } from '@/lib/market-research'
 import { MarketResearchResult } from '@/types/database'
 import { revalidatePath } from 'next/cache'
+import { calculateConditionAdjustments, ConditionAdjustmentResult } from '@/lib/valuation/iphone-condition'
 
 export type AnalysisResponse = {
   result?: ScoreResult;
   marketResearch?: MarketResearchResult;
+  conditionAdjustment?: ConditionAdjustmentResult;
   error?: string;
   needsManualPrice?: boolean;
 }
@@ -39,7 +41,7 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
 
     if (!marketPrice) {
       try {
-        marketResearch = await performMarketResearch(title, category, city);
+        marketResearch = await performMarketResearch(title, category, city, description);
         if (marketResearch.confidence_level === 'baixa' || marketResearch.estimated_market_price <= 0) {
           return { 
             error: 'Dados insuficientes para estimar o preço com segurança. Informe o preço manualmente.',
@@ -50,12 +52,17 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
         marketPrice = marketResearch.estimated_market_price;
       } catch (e: unknown) {
         console.error('Falha na pesquisa de mercado:', e);
-        const isInsufficient = e instanceof Error && e.message === 'Dados insuficientes para estimar o preço com segurança.';
+        const isInsufficient = e instanceof Error && e.message.includes('Dados insuficientes');
         return { 
           error: isInsufficient ? e.message : 'Não foi possível pesquisar o mercado neste momento.',
           needsManualPrice: true
         }
       }
+    }
+
+    let conditionAdjustment: ConditionAdjustmentResult | undefined;
+    if (marketResearch?.target_condition) {
+      conditionAdjustment = calculateConditionAdjustments(marketPrice, marketResearch.target_condition);
     }
 
     // 2. Insert into listings
@@ -89,11 +96,13 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
     // 3. Calculate score
     const analysisData: AnalysisData = {
       price,
-      marketPrice,
+      marketPrice: conditionAdjustment ? conditionAdjustment.conditionAdjustedMarketPrice : marketPrice,
       liquidity: 'alta', // simplification
       motivation: isMotivated ? 'alta' : 'media',
       recency: posted_time.toLowerCase().includes('hoje') ? 'hoje' : 'semana',
-      location: 'centro' // simplification
+      location: 'centro', // simplification
+      blockComprar: conditionAdjustment?.blockComprar,
+      confidenceLevel: marketResearch?.confidence_level
     }
 
     const calculatedResult = calculateScore(analysisData)
@@ -148,7 +157,7 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
     revalidatePath('/historico')
     revalidatePath('/oportunidades')
 
-    return { result: calculatedResult, marketResearch }
+    return { result: calculatedResult, marketResearch, conditionAdjustment }
   } catch (err: unknown) {
     console.error('Server action error:', err)
     return { error: 'Erro inesperado no servidor. Tente novamente mais tarde.' }

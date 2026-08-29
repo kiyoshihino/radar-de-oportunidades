@@ -5,6 +5,8 @@ export interface AnalysisData {
   motivation: 'baixa' | 'media' | 'alta';
   recency: 'hoje' | 'ontem' | 'semana' | 'antigo';
   location: 'centro' | 'bairro' | 'regiao' | 'longe';
+  blockComprar?: boolean;
+  confidenceLevel?: 'alta' | 'media' | 'baixa';
 }
 
 export interface ScoreResult {
@@ -77,6 +79,13 @@ export function calculateScore(data: AnalysisData): ScoreResult {
   if (score >= 85) decision = 'comprar';
   else if (score >= 70) decision = 'negociar';
   else if (score >= 50) decision = 'investigar';
+
+  // Cap decision based on unverified risks or low confidence
+  if (decision === 'comprar' || decision === 'negociar') {
+    if (data.blockComprar || data.confidenceLevel === 'baixa') {
+      decision = 'investigar';
+    }
+  }
 
   // Cálculos financeiros
   const fastSalePrice = data.marketPrice * 0.9; // Venda rápida 10% abaixo do mercado
