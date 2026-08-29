@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { AlertTriangle, CheckCircle, CheckSquare, Info, Calculator, AlertCircle, Search, ExternalLink } from "lucide-react";
 import { ScoreResult } from "@/lib/score";
 import { submitAnalysis, AnalysisResponse } from "./actions";
@@ -26,6 +26,8 @@ export default function AnalisarPage() {
   const [conditionAdjustment, setConditionAdjustment] = useState<ConditionAdjustmentResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [manualPrice, setManualPrice] = useState(false);
+  const [askingPrice, setAskingPrice] = useState<number>(0);
+  const [baseMarketPrice, setBaseMarketPrice] = useState<number>(0);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -33,6 +35,7 @@ export default function AnalisarPage() {
     setErrorMsg(null);
     
     const formData = new FormData(e.currentTarget);
+    setAskingPrice(Number(formData.get('price')));
     
     const response: AnalysisResponse = await submitAnalysis(formData);
     
@@ -46,6 +49,10 @@ export default function AnalisarPage() {
 
     if (response.marketResearch) {
       setMarketResearch(response.marketResearch);
+    }
+
+    if (response.marketPrice) {
+      setBaseMarketPrice(response.marketPrice);
     }
 
     if (response.conditionAdjustment) {
@@ -64,6 +71,7 @@ export default function AnalisarPage() {
     setErrorMsg(null);
     setMarketResearch(null);
     setConditionAdjustment(null);
+    setBaseMarketPrice(0);
   };
 
   if (result) {
@@ -245,26 +253,66 @@ export default function AnalisarPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                  <Info size={20} className="text-purple-500" />
-                  Por que é oportunidade?
-                </h3>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-2 text-sm text-slate-600">
-                    <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                    Preço abaixo da média de mercado
-                  </li>
-                  <li className="flex items-start gap-2 text-sm text-slate-600">
-                    <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                    Produto de alta liquidez
-                  </li>
-                  {result.score >= 70 && (
-                    <li className="flex items-start gap-2 text-sm text-slate-600">
-                      <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
-                      Score favorável para negociação rápida
-                    </li>
-                  )}
-                </ul>
+                {(() => {
+                  // Calculate dynamic opportunity reasons
+                  const targetMarket = conditionAdjustment ? conditionAdjustment.conditionAdjustedMarketPrice : baseMarketPrice;
+                  const discountVsAdjustedMarketPct = targetMarket > 0 ? ((targetMarket - askingPrice) / targetMarket) * 100 : 0;
+                  
+                  const isOpportunity = result.potentialProfit > 0 && discountVsAdjustedMarketPct > 0;
+                  
+                  return (
+                    <>
+                      <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        {isOpportunity ? (
+                          <><Info size={20} className="text-purple-500" /> Por que é oportunidade?</>
+                        ) : (
+                          <><AlertTriangle size={20} className="text-red-500" /> Por que não recomendamos esta compra?</>
+                        )}
+                      </h3>
+                      <ul className="space-y-3">
+                        {isOpportunity ? (
+                          <>
+                            <li className="flex items-start gap-2 text-sm text-slate-600">
+                              <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+                              Preço {discountVsAdjustedMarketPct.toFixed(1)}% abaixo do mercado ajustado
+                            </li>
+                            <li className="flex items-start gap-2 text-sm text-slate-600">
+                              <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+                              Margem de lucro potencial positiva ({result.profitMargin.toFixed(1)}%)
+                            </li>
+                            {result.score >= 70 && (
+                              <li className="flex items-start gap-2 text-sm text-slate-600">
+                                <CheckCircle size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+                                Score favorável para negociação rápida
+                              </li>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {askingPrice >= result.fastSalePrice && (
+                              <li className="flex items-start gap-2 text-sm text-slate-600">
+                                <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
+                                Preço de compra não deixa margem segura para revenda rápida.
+                              </li>
+                            )}
+                            {result.potentialProfit <= 0 && (
+                              <li className="flex items-start gap-2 text-sm text-slate-600">
+                                <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
+                                Margem potencial negativa ou nula.
+                              </li>
+                            )}
+                            {discountVsAdjustedMarketPct <= 0 && (
+                              <li className="flex items-start gap-2 text-sm text-slate-600">
+                                <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
+                                Preço pedido acima da média de mercado avaliada.
+                              </li>
+                            )}
+                          </>
+                        )}
+                      </ul>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">

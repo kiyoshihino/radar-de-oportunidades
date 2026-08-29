@@ -5,6 +5,20 @@ import { evaluateWithGemini } from './providers/gemini';
 import { analyzePrices } from './statistics';
 import { SearchResult, AIEvaluation } from './types';
 import { TargetConditionValue } from '../valuation/iphone-condition';
+import { extractTargetFacts } from '../valuation/extractor';
+
+function normalizeUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const urlObj = new URL(url);
+    // Remove tracking params
+    const paramsToRemove = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid', 'ref', 'tracking'];
+    paramsToRemove.forEach(p => urlObj.searchParams.delete(p));
+    return urlObj.toString();
+  } catch (_e) {
+    return url;
+  }
+}
 
 function mapToTargetConditionValue<T>(val: T | null | undefined): TargetConditionValue<T> {
   return {
@@ -18,7 +32,8 @@ export async function performMarketResearch(
   title: string, 
   category: string, 
   city: string | null,
-  description: string
+  description: string,
+  observations?: string
 ): Promise<MarketResearchResult> {
   const searchProvider = process.env.SEARCH_PROVIDER || 'tavily';
   const aiProvider = process.env.AI_PROVIDER || 'gemini';
@@ -74,8 +89,9 @@ export async function performMarketResearch(
         const originalTavily = tavilyUrls.get(evaluated.resultId);
         
         if (originalTavily) {
+          const normUrl = normalizeUrl(originalTavily.url);
           // Double check if we haven't already added this URL to avoid duplicates across loops
-          if (!validComparables.find(c => c.reference_url === originalTavily.url)) {
+          if (!validComparables.find(c => normalizeUrl(c.reference_url) === normUrl)) {
             validComparables.push({
               product_key: productKey,
               category,
@@ -115,12 +131,40 @@ export async function performMarketResearch(
     throw new Error('Dados insuficientes para estimar o preço com segurança.');
   }
 
+  // 2.5 Deduplication logic
+  const deduplicatedComparables: MarketPrice[] = [];
+  const urlSet = new Set<string>();
+  let deduplicatedCount = 0;
+
+  for (const comp of validComparables) {
+    const normUrl = normalizeUrl(comp.reference_url);
+    if (normUrl && urlSet.has(normUrl)) {
+      deduplicatedCount++;
+      continue;
+    }
+    if (normUrl) {
+      urlSet.add(normUrl);
+    }
+    
+    // Check semantic suspicion (same source + title + price)
+    // We do NOT strictly discard them if URL is different, 
+    // but here we ensure exact duplicates are logged/tracked.
+    // The user requested not to be too aggressive, so if URL is different, we keep it as a distinct listing.
+    
+    deduplicatedComparables.push(comp);
+  }
+
+  // Ensure we still have 3 unique after deduplication
+  if (deduplicatedComparables.length < 3) {
+    throw new Error('Dados insuficientes (menos de 3 comparáveis únicos) para estimar o preço com segurança.');
+  }
+
   // 3. Statistical Analysis
-  const prices = validComparables.map(c => c.asking_price);
+  const prices = deduplicatedComparables.map(c => c.asking_price);
   const stats = analyzePrices(prices);
 
-  // Re-filter the validComparables to match the statistical outliers removed
-  let finalComparables = validComparables.filter(c => stats.validPrices.includes(c.asking_price));
+  // Re-filter to match the statistical outliers removed
+  let finalComparables = deduplicatedComparables.filter(c => stats.validPrices.includes(c.asking_price));
   
   // Apply matchConfidence filtering
   // Discard 'low'
@@ -155,11 +199,34 @@ export async function performMarketResearch(
 
   const sourcesUsed = Array.from(new Set(finalComparables.map(c => c.source)));
   
-  let confidence_level: 'alta' | 'media' | 'baixa' = 'media';
+  let confidence_level: 'alta' | 'media' | 'baixa' = 'baixa';
   if (highCount >= 5) {
+    // If we have >=5 high matches, we consider it high confidence, even if from few sources, but better if diverse
     confidence_level = 'alta';
-  } else if (finalComparables.length < 3) {
-    confidence_level = 'baixa';
+  } else if (finalComparables.length >= 3) {
+    confidence_level = 'media';
+  }
+
+  // 6. Deterministic extraction overrides
+  const fullText = `${title} ${description} ${observations || ''}`;
+  const deterministicFacts = extractTargetFacts(fullText);
+
+  const target_condition = targetProductEvaluation ? {
+    batteryHealth: mapToTargetConditionValue(targetProductEvaluation.batteryHealth),
+    screenCondition: mapToTargetConditionValue(targetProductEvaluation.screenCondition),
+    backCondition: mapToTargetConditionValue(targetProductEvaluation.backCondition),
+    cameraCondition: mapToTargetConditionValue(targetProductEvaluation.cameraCondition),
+    faceIdWorking: mapToTargetConditionValue(targetProductEvaluation.faceIdWorking),
+    originalParts: mapToTargetConditionValue(targetProductEvaluation.originalParts),
+    hasBox: mapToTargetConditionValue(targetProductEvaluation.hasBox),
+    hasCharger: mapToTargetConditionValue(targetProductEvaluation.hasCharger),
+    knownDamage: mapToTargetConditionValue(targetProductEvaluation.knownDamage)
+  } : undefined;
+
+  if (target_condition) {
+    if (deterministicFacts.batteryHealth !== null) {
+      target_condition.batteryHealth = { value: deterministicFacts.batteryHealth, evidence: 'Extraído deterministicamente do formulário', confidence: 'explicit' };
+    }
   }
 
   return {
@@ -174,18 +241,8 @@ export async function performMarketResearch(
     confidence_level,
     sources_used: sourcesUsed,
     comparables: comparablesForOutput,
-    discarded_count: discardedCount + stats.outliersRemoved,
-    target_condition: targetProductEvaluation ? {
-      batteryHealth: mapToTargetConditionValue(targetProductEvaluation.batteryHealth),
-      screenCondition: mapToTargetConditionValue(targetProductEvaluation.screenCondition),
-      backCondition: mapToTargetConditionValue(targetProductEvaluation.backCondition),
-      cameraCondition: mapToTargetConditionValue(targetProductEvaluation.cameraCondition),
-      faceIdWorking: mapToTargetConditionValue(targetProductEvaluation.faceIdWorking),
-      originalParts: mapToTargetConditionValue(targetProductEvaluation.originalParts),
-      hasBox: mapToTargetConditionValue(targetProductEvaluation.hasBox),
-      hasCharger: mapToTargetConditionValue(targetProductEvaluation.hasCharger),
-      knownDamage: mapToTargetConditionValue(targetProductEvaluation.knownDamage)
-    } : undefined
+    discarded_count: discardedCount + stats.outliersRemoved + deduplicatedCount,
+    target_condition
   };
 }
 

@@ -7,6 +7,7 @@ export interface AnalysisData {
   location: 'centro' | 'bairro' | 'regiao' | 'longe';
   blockComprar?: boolean;
   confidenceLevel?: 'alta' | 'media' | 'baixa';
+  evaluationStrategy?: 'standard_resale' | 'other';
 }
 
 export interface ScoreResult {
@@ -93,6 +94,17 @@ export function calculateScore(data: AnalysisData): ScoreResult {
   const maxBuyPrice = Math.min(data.marketPrice * 0.7, fastSalePrice - 300);
   const potentialProfit = fastSalePrice - data.price;
   const profitMargin = (potentialProfit / data.price) * 100;
+
+  // Lógica de oportunidade: Standard Resale
+  const strategy = data.evaluationStrategy || 'standard_resale';
+  
+  if (strategy === 'standard_resale') {
+    if (potentialProfit <= 0) {
+      decision = 'ignorar';
+      score = Math.min(score, 49);
+      classification = 'ignorar';
+    }
+  }
 
   return {
     score,

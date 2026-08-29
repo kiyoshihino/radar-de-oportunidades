@@ -11,6 +11,7 @@ export type AnalysisResponse = {
   result?: ScoreResult;
   marketResearch?: MarketResearchResult;
   conditionAdjustment?: ConditionAdjustmentResult;
+  marketPrice?: number;
   error?: string;
   needsManualPrice?: boolean;
 }
@@ -157,7 +158,7 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
     revalidatePath('/historico')
     revalidatePath('/oportunidades')
 
-    return { result: calculatedResult, marketResearch, conditionAdjustment }
+    return { result: calculatedResult, marketResearch, conditionAdjustment, marketPrice }
   } catch (err: unknown) {
     console.error('Server action error:', err)
     return { error: 'Erro inesperado no servidor. Tente novamente mais tarde.' }
