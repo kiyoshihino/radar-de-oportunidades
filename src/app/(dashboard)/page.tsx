@@ -140,7 +140,7 @@ export default async function Dashboard() {
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.listings?.asking_price || 0)}
                     </td>
                     <td className="px-6 py-4 text-slate-600">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.analyses?.fast_sale_price || 0)}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.analyses?.quick_sale_price || 0)}
                     </td>
                     <td className="px-6 py-4 font-medium text-emerald-600">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(op.analyses?.potential_profit || 0)}
@@ -152,9 +152,9 @@ export default async function Dashboard() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        op.analyses?.score >= 85 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                        op.analyses?.decision === 'comprar' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {op.analyses?.classification}
+                        {op.analyses?.decision ? op.analyses.decision.charAt(0).toUpperCase() + op.analyses.decision.slice(1) : ''}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-500">

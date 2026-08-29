@@ -68,17 +68,27 @@ export type MarketPrice = {
 export type Analysis = {
   id: string
   listing_id: string
+  market_price_estimate: number
+  quick_sale_price: number
+  recommended_max_buy_price: number
+  potential_profit: number
+  potential_margin_pct: number
   score: number
   classification: string
-  market_price: number
-  fast_sale_price: number
-  max_buy_price: number
-  potential_profit: number
-  profit_margin: number
+  decision: string
   liquidity: string
-  motivation: string
-  recency: string
-  location_score: string
+  seller_motivation: string
+  risk_level?: string | null
+  price_score?: number | null
+  liquidity_score?: number | null
+  motivation_score?: number | null
+  recency_score?: number | null
+  location_score?: number | null
+  opportunity_reasons?: string[] | null
+  verification_items?: string[] | null
+  ai_summary?: string | null
+  analysis_version?: string | null
+  ai_model?: string | null
   created_at: string
 }
 

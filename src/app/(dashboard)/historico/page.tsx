@@ -91,7 +91,7 @@ export default async function HistoricoPage() {
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.listings?.asking_price || 0)}
                       </div>
                       <div className="text-slate-400 text-xs line-through">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.market_price || 0)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.market_price_estimate || 0)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -111,12 +111,12 @@ export default async function HistoricoPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        item.classification === 'Oportunidade excepcional' || item.classification === 'Grande oportunidade' ? 'bg-purple-100 text-purple-700' : 
-                        item.classification === 'Boa oportunidade' ? 'bg-blue-100 text-blue-700' : 
-                        item.classification === 'Investigar' ? 'bg-yellow-100 text-yellow-700' : 
+                        item.decision === 'comprar' ? 'bg-purple-100 text-purple-700' : 
+                        item.decision === 'negociar' ? 'bg-blue-100 text-blue-700' : 
+                        item.decision === 'investigar' ? 'bg-yellow-100 text-yellow-700' : 
                         'bg-slate-100 text-slate-600'
                       }`}>
-                        {item.classification}
+                        {item.decision.charAt(0).toUpperCase() + item.decision.slice(1)}
                       </span>
                     </td>
                   </tr>

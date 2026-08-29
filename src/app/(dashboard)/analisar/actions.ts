@@ -103,17 +103,21 @@ export async function submitAnalysis(formData: FormData): Promise<AnalysisRespon
       .from('analyses')
       .insert({
         listing_id: listing.id,
+        market_price_estimate: marketPrice,
+        quick_sale_price: calculatedResult.fastSalePrice,
+        recommended_max_buy_price: calculatedResult.maxBuyPrice,
+        potential_profit: calculatedResult.potentialProfit,
+        potential_margin_pct: calculatedResult.profitMargin,
         score: calculatedResult.score,
         classification: calculatedResult.classification,
-        market_price: marketPrice,
-        fast_sale_price: calculatedResult.fastSalePrice,
-        max_buy_price: calculatedResult.maxBuyPrice,
-        potential_profit: calculatedResult.potentialProfit,
-        profit_margin: calculatedResult.profitMargin,
+        decision: calculatedResult.decision,
         liquidity: analysisData.liquidity,
-        motivation: analysisData.motivation,
-        recency: analysisData.recency,
-        location_score: analysisData.location
+        seller_motivation: analysisData.motivation,
+        price_score: calculatedResult.priceScore,
+        liquidity_score: calculatedResult.liquidityScore,
+        motivation_score: calculatedResult.motivationScore,
+        recency_score: calculatedResult.recencyScore,
+        location_score: calculatedResult.locationScore
       })
       .select('id')
       .single()

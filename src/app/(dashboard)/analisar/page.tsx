@@ -6,6 +6,18 @@ import { ScoreResult } from "@/lib/score";
 import { submitAnalysis, AnalysisResponse } from "./actions";
 import { MarketResearchResult } from "@/types/database";
 
+
+const getClassificationLabel = (val: string) => {
+  switch (val) {
+    case 'excepcional': return 'Oportunidade excepcional';
+    case 'grande_oportunidade': return 'Grande oportunidade';
+    case 'boa_oportunidade': return 'Boa oportunidade';
+    case 'investigar': return 'Investigar';
+    case 'ignorar': return 'Ignorar';
+    default: return val ? val.charAt(0).toUpperCase() + val.slice(1) : '';
+  }
+};
+
 export default function AnalisarPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ScoreResult | null>(null);
@@ -71,22 +83,22 @@ export default function AnalisarPage() {
               }`}>
                 {result.score}
               </div>
-              <p className="mt-4 text-lg font-bold text-slate-800">{result.classification}</p>
+              <p className="mt-4 text-lg font-bold text-slate-800">{getClassificationLabel(result.classification)}</p>
             </div>
 
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
               <h3 className="font-semibold text-slate-800 border-b border-slate-100 pb-2">Decisão Recomendada</h3>
               <div className="space-y-3">
-                <button className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors">
-                  COMPRAR RÁPIDO
+                <button className={`w-full py-3 font-bold rounded-lg transition-colors ${result.decision === 'comprar' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                  COMPRAR
                 </button>
-                <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors">
-                  INVESTIGAR
-                </button>
-                <button className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg transition-colors">
+                <button className={`w-full py-3 font-bold rounded-lg transition-colors ${result.decision === 'negociar' ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
                   NEGOCIAR
                 </button>
-                <button className="w-full py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg transition-colors">
+                <button className={`w-full py-3 font-bold rounded-lg transition-colors ${result.decision === 'investigar' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                  INVESTIGAR
+                </button>
+                <button className={`w-full py-3 font-bold rounded-lg transition-colors ${result.decision === 'ignorar' ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
                   IGNORAR
                 </button>
               </div>
